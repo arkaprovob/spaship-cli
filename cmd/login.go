@@ -87,16 +87,21 @@ func storeDetailsInConfig(serverAddress string, response string, configPath stri
 
 		confList = configOb
 	}
-
+	entry := false
 	for i := 0; i < len(confList.ConfigList); i++ {
 		if confList.ConfigList[i].Server == serverAddress {
 			confList.ConfigList[i].Active = true
 			confList.ConfigList[i].AccessToken = responseJson.AccessToken
 			confList.ConfigList[i].Alias = responseJson.Identifier
+			entry = true
 		} else {
 			confList.ConfigList[i].Active = false
 		}
 
+	}
+
+	if !entry {
+		confList.AddConfig(conf)
 	}
 
 	file, _ := json.MarshalIndent(confList, "", " ")
@@ -171,5 +176,6 @@ func buildConfigObject(serverAddress string, responseJson Response) Configuratio
 	conf.Server = serverAddress
 	conf.AccessToken = responseJson.AccessToken
 	conf.Alias = responseJson.Identifier
+	conf.Active = true
 	return conf
 }
