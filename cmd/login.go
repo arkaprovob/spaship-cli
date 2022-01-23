@@ -19,12 +19,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/spf13/cobra"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/spf13/cobra"
 )
 
 // loginCmd represents the login command
@@ -64,14 +65,11 @@ func storeDetailsInConfig(serverAddress string, response string, configPath stri
 		return false
 	}
 
-	conf := new(Configuration).Init()
-	//Configuration{Server: serverAddress, AccessToken: responseJson.AccessToken}
-	conf.Server = serverAddress
-	conf.AccessToken = responseJson.AccessToken
+	conf := buildConfigObject(serverAddress, responseJson)
 	confJson, _ := json.Marshal(conf)
 	log.Println("storing config " + string(confJson))
 
-	jsonFile, err := os.Open("users.json")
+	jsonFile, err := os.Open(configPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -79,14 +77,30 @@ func storeDetailsInConfig(serverAddress string, response string, configPath stri
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	var confList ConfigList
 	json.Unmarshal(byteValue, &confList)
-	var entry bool = false;
+
+	if confList.ConfigList == nil {
+
+		log.Println("No entry found!!!!!")
+
+		configOb := ConfigList{}
+		configOb.AddConfig(conf)
+
+		confList = configOb
+	}
+
 	for i := 0; i < len(confList.ConfigList); i++ {
-		if confList.ConfigList[i].Server==serverAddress {
-			entry = true
-			confList.ConfigList[i].AccessToken =
+		if confList.ConfigList[i].Server == serverAddress {
+			confList.ConfigList[i].Active = true
+			confList.ConfigList[i].AccessToken = responseJson.AccessToken
+			confList.ConfigList[i].Alias = responseJson.Identifier
+		} else {
+			confList.ConfigList[i].Active = false
 		}
 
 	}
+
+	file, _ := json.MarshalIndent(confList, "", " ")
+	_ = ioutil.WriteFile(configPath, file, 0644)
 
 	return true
 }
@@ -150,4 +164,12 @@ func init() {
 	loginCmd.PersistentFlags().String("server", "", "api url")
 	loginCmd.PersistentFlags().String("token", "", "token to access the api")
 
+}
+
+func buildConfigObject(serverAddress string, responseJson Response) Configuration {
+	conf := new(Configuration).Init()
+	conf.Server = serverAddress
+	conf.AccessToken = responseJson.AccessToken
+	conf.Alias = responseJson.Identifier
+	return conf
 }
