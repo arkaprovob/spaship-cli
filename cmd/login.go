@@ -23,7 +23,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 )
@@ -39,7 +38,7 @@ var loginCmd = &cobra.Command{
 		serverUrl, _ := cmd.Flags().GetString("server")
 		accessToken, _ := cmd.Flags().GetString("token")
 
-		if checkArguments(serverUrl, accessToken) == false {
+		if !checkArguments(serverUrl, accessToken) {
 			return
 		}
 
@@ -58,6 +57,8 @@ var loginCmd = &cobra.Command{
 }
 
 func storeDetailsInConfig(serverAddress string, response string, configPath string) bool {
+
+	//transform response string into Response structure
 	var responseJson Response
 	err := json.Unmarshal([]byte(response), &responseJson)
 	if err != nil {
@@ -65,29 +66,44 @@ func storeDetailsInConfig(serverAddress string, response string, configPath stri
 		return false
 	}
 
-	conf := buildConfigObject(serverAddress, responseJson)
-	confJson, _ := json.Marshal(conf)
-	log.Println("storing config " + string(confJson))
+	//creates config entry from current login details
+	conf := buildConfigObject(serverAddress, responseJson) //confJson, _ := json.Marshal(conf)//log.Println("storing config " + string(confJson))
 
+	//Load config file into memory from local machine
 	jsonFile, err := os.Open(configPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer jsonFile.Close()
+
+	//transform the content into confList
 	byteValue, _ := ioutil.ReadAll(jsonFile)
 	var confList ConfigList
 	json.Unmarshal(byteValue, &confList)
 
+	//add current config if the file is empty
 	if confList.ConfigList == nil {
-
-		log.Println("No entry found!!!!!")
-
-		configOb := ConfigList{}
-		configOb.AddConfig(conf)
-
-		confList = configOb
+		log.Println("No entry found!!")
+		confList := ConfigList{}
+		confList.AddConfig(conf)
 	}
-	entry := false
+	//Cheks for the existing entry match
+	entry := checkExistingEntries(&confList, serverAddress, responseJson)
+
+	// when the current config entry not found add it to the list
+	if !entry {
+		confList.AddConfig(conf)
+	}
+
+	// re-write the list into the file
+	file, _ := json.MarshalIndent(confList, "", " ")
+	_ = ioutil.WriteFile(configPath, file, 0644)
+
+	return true
+}
+
+func checkExistingEntries(confList *ConfigList, serverAddress string, responseJson Response) bool {
+	var entry bool
 	for i := 0; i < len(confList.ConfigList); i++ {
 		if confList.ConfigList[i].Server == serverAddress {
 			confList.ConfigList[i].Active = true
@@ -99,15 +115,7 @@ func storeDetailsInConfig(serverAddress string, response string, configPath stri
 		}
 
 	}
-
-	if !entry {
-		confList.AddConfig(conf)
-	}
-
-	file, _ := json.MarshalIndent(confList, "", " ")
-	_ = ioutil.WriteFile(configPath, file, 0644)
-
-	return true
+	return entry
 }
 
 func authenticate(url string, accessToken string) string {
@@ -140,27 +148,13 @@ func checkArguments(server string, token string) bool {
 	return true
 }
 
-func computeConfigDirectory() string {
-	dirname, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return filepath.FromSlash(dirname + "/.spaship")
-}
-
-func createConfigFile(configDir string) string {
-	os.MkdirAll(configDir, os.ModePerm)
-	configFilePath := filepath.FromSlash(configDir + "/config")
-	var _, err = os.Stat(configFilePath)
-	if os.IsNotExist(err) {
-		var file, err = os.Create(configFilePath)
-		if os.IsExist(err) {
-			log.Fatal(err)
-			return ""
-		}
-		defer file.Close()
-	}
-	return configFilePath
+func buildConfigObject(serverAddress string, responseJson Response) Configuration {
+	conf := new(Configuration).Init()
+	conf.Server = serverAddress
+	conf.AccessToken = responseJson.AccessToken
+	conf.Alias = responseJson.Identifier
+	conf.Active = true
+	return conf
 }
 
 func init() {
@@ -169,13 +163,4 @@ func init() {
 	loginCmd.PersistentFlags().String("server", "", "api url")
 	loginCmd.PersistentFlags().String("token", "", "token to access the api")
 
-}
-
-func buildConfigObject(serverAddress string, responseJson Response) Configuration {
-	conf := new(Configuration).Init()
-	conf.Server = serverAddress
-	conf.AccessToken = responseJson.AccessToken
-	conf.Alias = responseJson.Identifier
-	conf.Active = true
-	return conf
 }
