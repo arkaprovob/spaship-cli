@@ -65,6 +65,7 @@ func switchServer(alias string, configPath string) {
 
 	if confList.ConfigList == nil {
 		log.Println("no configuration entry found!, please login before switching the server")
+		return
 	}
 
 	entry := modifyConfig(&confList, alias)
