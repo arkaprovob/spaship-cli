@@ -1,5 +1,5 @@
 /*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
+Copyright © 2022 Arkaprovo Bhattacharjee <apb@live.in>
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -85,6 +85,7 @@ var packCmd = &cobra.Command{
 		distContent, _ := IsDirEmpty(dist)
 		if !distExists || distContent {
 			fmt.Println("please select the right directory and execute the pack command")
+			return
 		}
 
 		if len(mapping) == 0 {
@@ -114,8 +115,15 @@ var packCmd = &cobra.Command{
 			}
 			if !mappingExists {
 				fmt.Println("mapping file not found in the current directory, please execute the pack command with the correct location")
+				return
 			}
 
+		}
+
+		mappingFileExists, _ := IsDirexists(mapping)
+		if !mappingFileExists {
+			fmt.Println("mapping file not found, please check the location")
+			return
 		}
 
 	},
