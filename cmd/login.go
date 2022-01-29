@@ -162,5 +162,4 @@ func init() {
 
 	loginCmd.PersistentFlags().String("server", "", "api url")
 	loginCmd.PersistentFlags().String("token", "", "token to access the api")
-
 }
